@@ -1,9 +1,9 @@
 {
-  "address": "0x12a573ab533A7BF78F85b1C148346E562f86085e",
-  "txHash": "0x2c8eae8670e3d466d5aa0bab5624c64fb7acfd02b962dda531742968978f3f39",
-  "deployedAt": "2025-07-31T13:32:09.282Z",
+  "address": "0x34994f1fAed0948e88B681B4C69ccA1530af9630",
+  "txHash": "0x7e9d3552ab34a5cb4e8bed3d8ab8efd634a9db3740b06f4d6e2d0fd5131dc9ad",
+  "deployedAt": "2025-08-02T16:59:57.727Z",
   "network": "https://testnet1.helioschainlabs.org",
-  "deployer": "0x3004027a4a36dA63B9A96311d5Dc9f8F6A012355",
+  "deployer": "0x353a79e337E3E0976E80f821DC8C0B84550d3B13",
   "abi": [
     {
       "inputs": [],

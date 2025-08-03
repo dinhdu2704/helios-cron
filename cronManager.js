@@ -51,7 +51,7 @@ class CronManager {
     try {
       const balance = await this.provider.getBalance(this.wallet.address);
       const requiredAmount = ethers.parseEther(this.config.DEPOSIT);
-      const gasEstimate = ethers.parseUnits(this.config.GAS_PRICE, "gwei") * BigInt(this.config.GAS_LIMIT + 50_000);
+      const gasEstimate = ethers.parseUnits(this.config.GAS_PRICE, "gwei") * BigInt(this.config.GAS_LIMIT + 200_000);
       const totalRequired = requiredAmount + gasEstimate;
       
       console.log(`  📊 Wallet address: ${this.wallet.address}`);

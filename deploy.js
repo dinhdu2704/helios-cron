@@ -16,6 +16,46 @@ class ContractDeployer {
   }
 
   /**
+   * Get current nonce for the wallet
+   */
+  async getCurrentNonce() {
+    const nonce = await this.provider.getTransactionCount(this.wallet.address, "latest");
+    console.log(`🔢 Current nonce: ${nonce}`);
+    return nonce;
+  }
+
+  /**
+   * Wait for pending transactions to be confirmed
+   */
+  async waitForPendingTransactions() {
+    console.log("⏳ Checking for pending transactions...");
+    const nonce = await this.getCurrentNonce();
+    const pendingNonce = await this.provider.getTransactionCount(this.wallet.address, "pending");
+    
+    if (pendingNonce > nonce) {
+      console.log(`⚠️  Found ${pendingNonce - nonce} pending transaction(s), waiting for confirmation...`);
+      // Wait a bit for pending transactions to be confirmed
+      await new Promise(resolve => setTimeout(resolve, 10000)); // Wait 10 seconds
+      const newNonce = await this.getCurrentNonce();
+      console.log(`✅ Nonce updated to: ${newNonce}`);
+    } else {
+      console.log("✅ No pending transactions found");
+    }
+  }
+
+  /**
+   * Reset wallet nonce (useful for nonce mismatch issues)
+   */
+  async resetNonce() {
+    console.log("🔄 Resetting wallet nonce...");
+    // Clear the nonce cache by reconnecting the wallet
+    this.wallet = new ethers.Wallet(process.env.PRIVATE_KEY, this.provider);
+    const nonce = await this.getCurrentNonce();
+    console.log(`✅ Nonce reset to: ${nonce}`);
+    return nonce;
+  }
+
+  /**
    * Read contract source code
    */
   readContractSource() {
@@ -98,6 +138,12 @@ class ContractDeployer {
         throw new Error("Insufficient balance, need at least 0.01 HLS to deploy contract");
       }
       
+      // Wait for any pending transactions to be confirmed
+      await this.waitForPendingTransactions();
+      
+      // Get current nonce
+      const nonce = await this.getCurrentNonce();
+      
       // Compile contract
       const { abi, bytecode } = await this.compileContract();
       
@@ -112,12 +158,31 @@ class ContractDeployer {
       console.log(`⛽ Estimated Gas: ${gasEstimate.toString()}`);
       console.log(`💸 Estimated cost: ${ethers.formatEther(gasEstimate * gasPrice.gasPrice)} HLS`);
       
-      // Deploy contract
+      // Deploy contract with explicit nonce
       console.log("📤 Sending deployment transaction...");
-      const contract = await contractFactory.deploy({
-        gasLimit: gasEstimate + BigInt(50000), // Add some Gas buffer
-        gasPrice: gasPrice.gasPrice
-      });
+      let contract;
+      try {
+        contract = await contractFactory.deploy({
+          gasLimit: gasEstimate + BigInt(500000), // Add some Gas buffer
+          gasPrice: gasPrice.gasPrice,
+          nonce: nonce
+        });
+      } catch (deployError) {
+        // If nonce error occurs, try to reset and retry once
+        if (deployError.message.includes("invalid nonce") || deployError.message.includes("sequence")) {
+          console.log("⚠️  Nonce error detected, attempting to reset and retry...");
+          await this.resetNonce();
+          const newNonce = await this.getCurrentNonce();
+          
+          contract = await contractFactory.deploy({
+            gasLimit: gasEstimate + BigInt(500000),
+            gasPrice: gasPrice.gasPrice,
+            nonce: newNonce
+          });
+        } else {
+          throw deployError;
+        }
+      }
       
       console.log(`⏳ Deployment transaction hash: ${contract.deploymentTransaction().hash}`);
       console.log("⏳ Waiting for transaction confirmation...");
@@ -239,7 +304,21 @@ async function main() {
     console.error("\n❌ Deployment process failed:");
     console.error(`💥 Error: ${error.message}`);
     
-    console.log("\n💡 Troubleshooting:");
+    // Check for nonce-related errors
+    if (error.message.includes("invalid nonce") || error.message.includes("sequence")) {
+      console.log("\n🔧 Nonce mismatch detected! This usually happens when:");
+      console.log("  - There are pending transactions that haven't been confirmed");
+      console.log("  - The wallet was used elsewhere with a different nonce");
+      console.log("  - Network issues caused transaction failures");
+      
+      console.log("\n💡 Solutions:");
+      console.log("  1. Wait a few minutes and try again (pending transactions may confirm)");
+      console.log("  2. Check your wallet in the block explorer for pending transactions");
+      console.log("  3. If the issue persists, try using a different wallet");
+      console.log("  4. The script now includes automatic nonce handling - try running it again");
+    }
+    
+    console.log("\n💡 General troubleshooting:");
     console.log("  - Ensure PRIVATE_KEY in .env file is correct");
     console.log("  - Ensure wallet has sufficient HLS balance");
     console.log("  - Check network connection and RPC_URL");
